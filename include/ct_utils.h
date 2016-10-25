@@ -70,21 +70,63 @@ static char clock_started, is_clock_lock_init;
 static inline void ct_print_fi_error(const char *fi_fname, int ret_val)
 {
 	fprintf(stderr, "%s() ret=%d (%s)\n", fi_fname, ret_val,
-		fi_strerror(ret_val));
+		fi_strerror(-ret_val));
 	fflush(stdout);
 }
+
+#define CT_STD_OPTS "p:"
 
 static inline void ct_print_opts_usage(const char *opt, const char *desc)
 {
 	fprintf(stderr, " %-20s %s\n", opt, desc);
 }
 
-void ct_parseinfo(int op, char *optarg, struct fi_info *hints);
+static inline void ct_print_std_usage()
+{
+	ct_print_opts_usage("-p <provider>", "specified provider (e.g., gni)");
+}
+
+#include <string.h>
+static inline void
+ct_parse_std_opts(int op, char *optarg, struct fi_info *hints)
+{
+	switch(op) {
+	case 'p':
+		if (hints) {
+			if (!hints->fabric_attr) {
+				hints->fabric_attr =
+					malloc(sizeof(struct fi_fabric_attr));
+			}
+			assert(hints->fabric_attr);
+			hints->fabric_attr->prov_name = strdup(optarg);
+		}
+		break;
+	}
+}
 
 /* general utilities */
 #include <sys/time.h>
 #include <time.h>
 #include <stdint.h>
+
+/* Branch predictor hints */
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
+#ifdef NDEBUG
+#define ASSERT_MSG(cond, fmt, args...) do { } while (0)
+#else
+#include <assert.h>
+#include <stdio.h>
+#define ASSERT_MSG(cond, fmt, args...) \
+	do { \
+		if (unlikely(!(cond))) { \
+			fprintf(stderr, "[%s:%d] " fmt "\n", __func__, __LINE__, ##args); \
+			fflush(stderr); \
+			assert(cond); \
+		} \
+	} while (0)
+#endif
 
 static inline uint64_t get_time_usec(void)
 {
